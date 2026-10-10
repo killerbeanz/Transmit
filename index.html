@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Transmit</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+:root{--bg:#eef1f4;--fg:#0e1b26;--mut:#5d6b78;--card:#fff;--bd:#cfd6dd;--ac:#2446ff;--on:#fff;--ok:#0f8a5f}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1219;--fg:#e6edf3;--mut:#8696a5;--card:#121c26;--bd:#243341;--ac:#7a92ff;--on:#0b1219;--ok:#43c795}}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+.split{display:grid;grid-template-columns:1fr 1fr;min-height:100dvh}
+.split>section{display:flex;flex-direction:column;justify-content:center;min-width:0;padding:72px clamp(16px,4vw,48px) 40px}
+.split>section>*{width:100%;max-width:480px;margin-left:auto;margin-right:auto}
+#recv{background:var(--card);border-left:1px solid var(--bd)}
+h2{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:16px}
+h1{position:absolute;top:18px;left:clamp(16px,4vw,48px);font-size:26px;font-weight:800;letter-spacing:-.04em;margin:0}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:12px}
+.dz{border:2px dashed var(--bd);border-radius:16px;padding:44px 16px;text-align:center;transition:border-color .15s,background .15s}
+.dz.hot{border-color:var(--ac);background:var(--card)}
+.dz p{margin:0 0 16px;font-size:18px;font-weight:600}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.dz .row{justify-content:center}
+button,.btn{font:600 14px inherit;background:var(--ac);color:var(--on);border:0;border-radius:8px;padding:9px 16px;cursor:pointer;display:inline-block}
+button.ghost{background:none;color:var(--fg);border:1px solid var(--bd)}
+button:focus-visible,.btn:focus-within,input:focus-visible,a:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+input[type=text]{width:100%;font:inherit;padding:11px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--fg);margin-bottom:10px}
+#ci{font:700 22px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.12em;text-align:center;text-transform:uppercase}
+.code{font:800 clamp(18px,3vw,36px) ui-monospace,Menlo,Consolas,monospace;letter-spacing:.08em;text-align:center;margin:6px 0 14px}
+.mut{color:var(--mut);font-size:13px}
+.bar{height:6px;border-radius:3px;background:var(--bd);overflow:hidden;margin:8px 0 4px}
+.bar b{display:block;height:100%;background:var(--ac);transition:width .25s}
+.tag{font-size:12px;font-weight:600;padding:2px 10px;border-radius:99px;border:1px solid var(--bd);color:var(--mut)}
+.tag.ok{color:var(--ok);border-color:var(--ok)}
+.err{color:#d6382f;min-height:20px;font-size:14px}
+.fr{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:8px 0;border-top:1px solid var(--bd)}
+.fr:first-child{border:0}.fr .bar{grid-column:1/-1;margin:2px 0}
+.fr a{display:flex;padding:4px}
+.fn{overflow-wrap:anywhere}
+a{color:var(--ac);font-weight:600}
+@media(max-width:760px){.split{grid-template-columns:1fr}.split>section{min-height:50dvh}#recv{border-left:0;border-top:1px solid var(--bd)}.code{font-size:clamp(22px,6vw,34px)}}
+</style></head><body><h1>Transmit</h1>
+<main class="split">
+
+<section id="send"><h2>Send</h2>
+ <div id="dz" class="dz"><p>Drop files or folders</p>
+  <div class="row"><label class="btn">Upload<input id="fi" type="file" multiple hidden></label></div>
+  <div id="derr" class="err"></div>
+ </div>
+ <div id="sess" hidden>
+  <div class="card">
+   <div class="mut">Share this code</div>
+   <div id="code" class="code">…</div>
+   <div class="row"><span id="meta" class="mut"></span><span class="row"><button id="cc" class="ghost">Copy code</button><button id="cl" class="ghost">Copy link</button></span></div>
+   <div id="serr" class="err"></div>
+  </div>
+  <div id="rl"></div>
+  <div class="row"><span id="tmr" class="mut"></span><button id="end" class="ghost">End session</button></div>
+ </div>
+</section>
+
+<section id="recv"><h2>Receive</h2>
+ <div id="rform" class="card">
+  <input id="ci" type="text" maxlength="16" placeholder="CODE" autocomplete="off" spellcheck="false">
+  <input id="ni" type="text" maxlength="40" placeholder="Your name">
+  <div class="row"><span id="rerr" class="err"></span><button id="jb">Connect</button></div>
+ </div>
+ <div id="rview" class="card" hidden>
+  <div class="row"><b id="rs"></b><span id="rn" class="mut"></span></div>
+  <div id="rbar"></div>
+  <div id="rfl"></div>
+  <div class="row" style="margin-top:12px"><button id="sa" class="ghost" hidden>Save all</button><button id="rd" class="ghost">Cancel</button></div>
+ </div>
+</section>
+</main>
+<script>
+const $=s=>document.querySelector(s),CH=16384,H=36e5,AL='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const esc=s=>String(s).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+const sz=n=>{const u=['B','KB','MB','GB','TB'];let i=0;while(n>=1024&&i<4){n/=1024;i++}return n.toFixed(i?1:0)+' '+u[i]};
+const bar=p=>`<div class="bar"><b style="width:${Math.min(1,p)*100}%"></b></div>`;
+const tm=ms=>{const s=Math.max(0,Math.ceil(ms/1e3));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const set=(el,h)=>{if(el._h!==h)el.innerHTML=el._h=h};
+const CT=new Uint32Array(256).map((_,n)=>{for(let k=0;k<8;k++)n=n&1?0xEDB88320^n>>>1:n>>>1;return n>>>0});
+const crc=(c,u)=>{c=~c;for(let i=0;i<u.length;i++)c=CT[(c^u[i])&255]^c>>>8;return~c>>>0};
+const zn=f=>f.n.replace(/\\/g,'/').split('/').filter(x=>x&&x!='.'&&x!='..').join('/')||'file';
+function zip(fs){
+ const E=new TextEncoder(),D=new Date(),zt=D.getHours()<<11|D.getMinutes()<<5|D.getSeconds()>>1,zd=D.getFullYear()-1980<<9|D.getMonth()+1<<5|D.getDate();
+ const P=[],C=[];let off=0;
+ for(const f of fs){
+  const n=E.encode(zn(f)),k=f.c>>>0,z=f.blob.size;
+  const l=new DataView(new ArrayBuffer(30));
+  l.setUint32(0,0x04034b50,1);l.setUint16(4,20,1);l.setUint16(6,0x800,1);l.setUint16(10,zt,1);l.setUint16(12,zd,1);l.setUint32(14,k,1);l.setUint32(18,z,1);l.setUint32(22,z,1);l.setUint16(26,n.length,1);
+  P.push(l.buffer,n,f.blob);
+  const c=new DataView(new ArrayBuffer(46));
+  c.setUint32(0,0x02014b50,1);c.setUint16(4,20,1);c.setUint16(6,20,1);c.setUint16(8,0x800,1);c.setUint16(12,zt,1);c.setUint16(14,zd,1);c.setUint32(16,k,1);c.setUint32(20,z,1);c.setUint32(24,z,1);c.setUint16(28,n.length,1);c.setUint32(42,off,1);
+  C.push(c.buffer,n);off+=30+n.length+z;
+ }
+ const sz=C.reduce((a,x)=>a+x.byteLength,0),e=new DataView(new ArrayBuffer(22));
+ e.setUint32(0,0x06054b50,1);e.setUint16(8,fs.length,1);e.setUint16(10,fs.length,1);e.setUint32(12,sz,1);e.setUint32(16,off,1);
+ return new Blob([...P,...C,e.buffer],{type:'application/zip'})}
+const dl=(u,n)=>{const a=document.createElement('a');a.href=u;a.download=n;a.click()};
+const eta=s=>{s=Math.ceil(s);const h=s/3600|0,m=s%3600/60|0,q=x=>String(x).padStart(2,'0');return(h?h+':'+q(m):m)+':'+q(s%60)};
+const rate=(o,b)=>{const n=performance.now();if(o.lt==null){o.lt=n;o.lb=b}else if(n-o.lt>=500){const v=(b-o.lb)/(n-o.lt)*1e3;o.v=o.v==null?v:o.v*.7+v*.3;o.lt=n;o.lb=b}return o.v};
+const stat=(o,b,t,on)=>{if(!on)return'';const v=rate(o,b);return v>1?`, ${sz(v)}/s, ${eta((t-b)/v)} left`:''};
+const IC='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 20h16"/></svg>';
+const nm=f=>f.n.replace(/\//g,'_');
+const dev=()=>{const u=navigator.userAgent;return(/Edg\//.test(u)?'Edge':/OPR\//.test(u)?'Opera':/Firefox\//.test(u)?'Firefox':/Chrome\//.test(u)?'Chrome':/Safari\//.test(u)?'Safari':'Browser')+' on '+(/Windows/.test(u)?'Windows':/Android/.test(u)?'Android':/iPhone|iPad/.test(u)?'iOS':/Mac/.test(u)?'macOS':/Linux/.test(u)?'Linux':'unknown OS')};
+
+if(/^#[A-Za-z0-9]{12}$/.test(location.hash)){$('#ci').value=location.hash.slice(1).toUpperCase()}
+
+/* sender */
+let files=[],total=0,peer,code,rs=[],dead=false,deadline=0,T;
+function pick(l){if(peer||!l.length)return;files=l;total=l.reduce((a,f)=>a+f.file.size,0);begin()}
+function begin(){
+ code=Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>AL[b%31]).join('');
+ peer=new Peer('p2pf-'+code);
+ peer.on('connection',onConn);
+ peer.on('disconnected',()=>!dead&&peer.reconnect());
+ peer.on('error',e=>{if(e.type=='unavailable-id'){peer.destroy();begin()}else $('#serr').textContent='Error: '+e.type});
+}
+function onConn(c){
+ const r={c,name:'…',dev:'',ip:'',sent:0,done:false,go:false,ok:false,rej:false};rs.push(r);
+ c.on('data',d=>{let m;try{m=JSON.parse(d)}catch{return}
+  if(m.t=='h'&&!r.go){r.go=true;r.name=String(m.n||'Unnamed').slice(0,40);r.dev=String(m.d||'').slice(0,60);ipOf(c).then(v=>r.ip=v)}
+  if(m.t=='d'&&r.ok){r.done=true;r.sent=total;deadline=Date.now()+H;clearTimeout(T);T=setTimeout(end,H)}});
+}
+function decide(r,y){
+ if(y){if(r.ok||r.rej)return;r.ok=true;stream(r.c,r)}
+ else{if(r.rej)return;r.rej=true;try{r.c.send('{"t":"r"}')}catch{}setTimeout(()=>r.c.close(),300)}
+}
+['click','pointerdown'].forEach(ev=>$('#rl').addEventListener(ev,e=>{const b=e.target.closest('[data-a]');if(b)decide(rs[b.dataset.i],b.dataset.a=='y')}));
+async function ipOf(c){try{const s=await c.peerConnection.getStats();let p;s.forEach(x=>{if(x.type=='candidate-pair'&&x.nominated&&x.state=='succeeded')p=x});const a=s.get(p.remoteCandidateId),v=a.address||a.ip;return v.endsWith('.local')?'local network':v}catch{return''}}
+async function stream(c,r){
+ const dc=c.dataChannel;dc.bufferedAmountLowThreshold=1<<20;
+ c.send(JSON.stringify({t:'m',f:files.map(x=>({n:x.path,s:x.file.size}))}));
+ for(let i=0;i<files.length;i++){
+  const f=files[i].file;c.send(JSON.stringify({t:'f',i}));
+  for(let o=0;o<f.size;o+=CH){
+   if(!c.open)return;
+   if(dc.bufferedAmount>4<<20)await new Promise(ok=>dc.addEventListener('bufferedamountlow',ok,{once:true}));
+   const b=await f.slice(o,o+CH).arrayBuffer();c.send(b);r.sent+=b.byteLength;
+  }
+  c.send(JSON.stringify({t:'e',i}));
+ }
+}
+function end(){dead=true;clearTimeout(T);peer&&peer.destroy();reset()}
+const reset=()=>{history.replaceState(null,'',location.pathname+location.search);location.reload()};
+async function walk(en,p=''){
+ if(en.isFile)return[{file:await new Promise((ok,no)=>en.file(ok,no)),path:p+en.name}];
+ const rd=en.createReader(),all=[];let b;
+ do{b=await new Promise((ok,no)=>rd.readEntries(ok,no));all.push(...b)}while(b.length);
+ return(await Promise.all(all.map(e=>walk(e,p+en.name+'/')))).flat()}
+async function hwalk(h,p=''){
+ if(h.kind=='file')return[{file:await h.getFile(),path:p+h.name}];
+ const o=[];for await(const x of h.values())o.push(...await hwalk(x,p+h.name+'/'));return o}
+$('#fi').onchange=e=>pick([...e.target.files].map(f=>({file:f,path:f.name})));
+const dz=$('#dz');
+dz.ondragover=e=>{e.preventDefault();dz.classList.add('hot')};
+dz.ondragleave=()=>dz.classList.remove('hot');
+dz.ondrop=async e=>{e.preventDefault();dz.classList.remove('hot');$('#derr').textContent='';
+ const it=[...e.dataTransfer.items].filter(i=>i.kind=='file');
+ const hs=it.map(i=>i.getAsFileSystemHandle?i.getAsFileSystemHandle().catch(()=>null):null);
+ const en=it.map(i=>i.webkitGetAsEntry&&i.webkitGetAsEntry());
+ const rd=async k=>{const h=await hs[k];if(h)try{return await hwalk(h)}catch{}return walk(en[k])};
+ try{const o=[];for(let k=0;k<it.length;k++)o.push(...await rd(k));
+  if(o.length)pick(o);else $('#derr').textContent='No files found'}
+ catch{$('#derr').textContent='Cannot read this folder. Open the page over http://localhost instead of file://'}};
+$('#cc').onclick=()=>navigator.clipboard.writeText(code);
+$('#cl').onclick=()=>navigator.clipboard.writeText(location.href.split('#')[0]+'#'+code);
+$('#end').onclick=end;
+
+function renderSend(){
+ $('#dz').hidden=!!peer;$('#sess').hidden=!peer;if(!peer)return;
+ $('#code').textContent=peer.open?code.replace(/(.{4})(?=.)/g,'$1 '):'…';
+ $('#meta').textContent=`${files.length} file${files.length>1?'s':''}, ${sz(total)}`;
+ $('#tmr').textContent=deadline?'Session ends in '+tm(deadline-Date.now()):'';
+ set($('#rl'),rs.map((r,i)=>{
+  const wait=r.go&&!r.ok&&!r.rej,left=!r.done&&!r.c.open,p=!total||r.done?1:Math.max(0,r.sent-(r.c.dataChannel?.bufferedAmount||0))/total;
+  const st=r.rej?'Rejected':r.done?'Done':left?'Disconnected':wait?'Awaiting approval':r.ok?'Sending':'Connecting';
+  const act=wait?`<button data-a="y" data-i="${i}">Approve</button><button data-a="n" data-i="${i}" class="ghost">Reject</button>`:r.ok&&!r.done&&!r.rej&&!left?`<button data-a="n" data-i="${i}" class="ghost">Remove</button>`:'';
+  return `<div class="card"><div class="row"><b>${esc(r.name)}</b><span class="tag ${r.done?'ok':''}">${st}</span></div>
+  <div class="mut">${esc([r.dev,r.ip].filter(Boolean).join(', '))}</div>${r.ok?bar(p)+`<div class="mut">${sz(p*total)} of ${sz(total)}${stat(r,p*total,total,!r.done&&!r.rej&&!left)}</div>`:''}${act?`<div class="row" style="margin-top:10px;justify-content:flex-start">${act}</div>`:''}</div>`}).join('')
+  ||'<p class="mut">Waiting for recipients…</p>');
+}
+
+/* receiver */
+let rp,rc,rf=[],rt=0,rg=0,cur,rst='idle',rfin=false,rclosed=false,rrej=false,RR={};
+const fail=m=>rreset(m);
+function rreset(m){const c=rc;rc=null;c&&c.close();rp&&rp.destroy();rf.forEach(f=>f.url&&URL.revokeObjectURL(f.url));rf=[];rt=rg=0;cur=null;rst='idle';RR={};rfin=rclosed=rrej=false;if(!m)$('#ci').value='';$('#rerr').textContent=m||''}
+function connect(){
+ const k=$('#ci').value.replace(/[^A-Za-z0-9]/g,'').toUpperCase();if(k.length!=12)return;
+ $('#rerr').textContent='';rst='conn';
+ const to=setTimeout(()=>rst=='conn'&&fail('Connection timed out'),2e4);
+ rp=new Peer();
+ rp.on('error',e=>{clearTimeout(to);if(rst!='recv')fail(e.type=='peer-unavailable'?'Invalid or expired code':'Error: '+e.type)});
+ rp.on('open',()=>{
+  const c=rc=rp.connect('p2pf-'+k,{serialization:'raw',reliable:true});
+  c.on('open',()=>{clearTimeout(to);rst='recv';c.send(JSON.stringify({t:'h',n:$('#ni').value.trim()||'Unnamed',d:dev()}))});
+  c.on('data',rdata);
+  c.on('close',()=>{if(rc!==c)return;if(rfin)rclosed=true;else rreset(rrej?'Rejected by sender':'Connection lost')});
+ });
+}
+function rdata(d){
+ if(typeof d=='string'){const m=JSON.parse(d);if(m.t=='r')rrej=true;
+  if(m.t=='m'){rf=m.f.map(f=>({n:f.n,s:f.s,p:[],g:0,c:0}));rt=rf.reduce((a,f)=>a+f.s,0)}
+  if(m.t=='f')cur=rf[m.i];
+  if(m.t=='e'){const f=rf[m.i];f.blob=new Blob(f.p);f.url=URL.createObjectURL(f.blob);f.p=null;
+   if(rf.every(x=>x.url)){rfin=true;rc.send('{"t":"d"}')}}
+ }else{cur.p.push(d);cur.c=crc(cur.c,new Uint8Array(d));cur.g+=d.byteLength;rg+=d.byteLength}
+}
+$('#jb').onclick=connect;
+$('#ci').onkeydown=e=>{if(e.key=='Enter')connect()};
+$('#sa').onclick=()=>{if(rt>=0xFFFFFFFF||rf.length>65535)return rf.forEach(f=>dl(f.url,nm(f)));const u=URL.createObjectURL(zip(rf));dl(u,'transmit.zip');setTimeout(()=>URL.revokeObjectURL(u),6e4)};
+$('#rd').onclick=()=>rreset();
+function renderRecv(){
+ const on=rst=='recv';$('#rform').hidden=on||rst=='conn';$('#rview').hidden=!on;
+ $('#jb').disabled=rst=='conn';$('#jb').textContent=rst=='conn'?'Connecting…':'Connect';
+ if(!on)return;
+ $('#rs').textContent=rrej?'Rejected by sender':rclosed?(rfin?'Session ended':'Connection lost'):rfin?'Transfer complete':rf.length?'Receiving':'Waiting for sender approval';
+ $('#rn').textContent=rf.length?`${sz(rg)} of ${sz(rt)}${stat(RR,rg,rt,!rfin&&!rclosed)}`:'';
+ set($('#rbar'),rf.length?bar(rt?rg/rt:1):'');
+ set($('#rfl'),rf.map(f=>`<div class="fr"><span class="fn">${esc(f.n)}</span>${f.url?`<a href="${f.url}" download="${esc(nm(f))}" aria-label="Save" title="Save">${IC}</a>`:`<span class="mut">${sz(f.s)}</span>`}${f.url?'':bar(f.s?f.g/f.s:0)}</div>`).join(''));
+ $('#sa').hidden=!rfin;
+ $('#rd').textContent=rfin?'Done':'Cancel';
+}
+setInterval(()=>{renderSend();renderRecv()},250);
+</script></body></html>
